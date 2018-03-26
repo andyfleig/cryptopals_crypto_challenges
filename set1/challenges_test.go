@@ -40,3 +40,10 @@ func TestChallenge3(t *testing.T) {
     t.Error("c3: wrong result", res)
   }
 }
+
+func TestChallenge4(t *testing.T) {
+  res := detectSingleCharacterXOR("./scXORs.txt")
+  if res != 171 {
+    t.Error("c4: wrong result", res)
+  }
+}

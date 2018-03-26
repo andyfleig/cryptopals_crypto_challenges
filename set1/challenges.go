@@ -12,6 +12,10 @@ import "encoding/hex"
 // challenge 3
 import "bytes"
 
+// challenge 4
+import "os"
+import "bufio"
+
 func main() {
 }
 
@@ -38,7 +42,7 @@ func fixedXOR(in1 []byte, in2 []byte) []byte {
 }
 
 // challenge 3
-func singleByteXORCipher(in string) string {
+func singleByteXORCipherWithScore(in string) (string,int) {
   in_hex, err := hex.DecodeString(in)
   if err != nil {
     fmt.Println(err)
@@ -84,6 +88,34 @@ func singleByteXORCipher(in string) string {
     }
 
   }
-  return string(best_result[:len(in_arr)])
+  return string(best_result[:len(in_arr)]),best_score
+}
 
+
+// challenge 4
+func singleByteXORCipher(in string) string {
+  res, _ := singleByteXORCipherWithScore(in)
+  return res
+}
+
+func detectSingleCharacterXOR(in string) int {
+  inData, err := os.Open(in)
+  if (err != nil) {
+    fmt.Println(err)
+  }
+
+  scanner := bufio.NewScanner(inData)
+
+  highest_score := 0
+  counter := 1
+  counter_at_highest_score := 0
+  for scanner.Scan() {
+    _,score := singleByteXORCipherWithScore(scanner.Text())
+    if (score > highest_score) {
+      highest_score = score
+      counter_at_highest_score = counter
+    }
+    counter++
+  }
+  return counter_at_highest_score
 }
