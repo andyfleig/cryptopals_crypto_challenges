@@ -9,11 +9,10 @@ import "fmt"
 import "encoding/base64"
 import "encoding/hex"
 
-// challange 3
+// challenge 3
 import "bytes"
 
 func main() {
-  singleByteXORCipher("ETAOIN SHRDLU")
 }
 
 // challenge 1
@@ -38,6 +37,7 @@ func fixedXOR(in1 []byte, in2 []byte) []byte {
   return result
 }
 
+// challenge 3
 func singleByteXORCipher(in string) string {
   in_hex, err := hex.DecodeString(in)
   if err != nil {
@@ -85,6 +85,5 @@ func singleByteXORCipher(in string) string {
 
   }
   return string(best_result[:len(in_arr)])
-  // loop over all characters:
 
 }
