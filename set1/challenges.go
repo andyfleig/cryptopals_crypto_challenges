@@ -17,6 +17,7 @@ import "os"
 import "bufio"
 
 func main() {
+
 }
 
 // challenge 1
@@ -118,4 +119,27 @@ func detectSingleCharacterXOR(in string) int {
     counter++
   }
   return counter_at_highest_score
+}
+
+// challenge 5
+func repeatingKeyXOR(msg string, key string) []byte{
+  msg_arr := []byte(msg)
+  key_arr := []byte(key)
+
+  result := make([]byte, len(msg_arr))
+  key_char_number := 0
+  for i := 0; i < len(msg_arr); i++ {
+    msg_element := make([]byte, 1)
+    msg_element[0] = msg_arr[i]
+    key_element := make([]byte, 1)
+    key_element[0] = key_arr[key_char_number]
+    result[i] = fixedXOR(msg_element, key_element)[0]
+
+    key_char_number++
+    // loop over key-characters:
+    if (key_char_number >= len(key_arr)) {
+      key_char_number = 0
+    }
+  }
+  return result
 }
