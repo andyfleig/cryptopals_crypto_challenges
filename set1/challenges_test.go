@@ -55,3 +55,23 @@ func TestChallenge5(t *testing.T) {
     t.Error("c5: wrong result", hex.EncodeToString(res))
   }
 }
+
+func TestStringToBin(t *testing.T) {
+  res := stringToBin("abc")
+
+  if res != "011000010110001001100011" {
+    t.Error("c6/stringToBin: wrong result", res)
+  }
+}
+
+func TestCalcHammingDist(t *testing.T) {
+  res := calcHammingDist("this is a test", "wokka wokka!!!")
+
+  if res != 37 {
+    t.Error("c6/calcHammingDist: wrong result", res)
+  }
+}
+
+func TestChallenge6(t *testing.T) {
+  breakRepeatingKeyXOR("./6.txt")
+}

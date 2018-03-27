@@ -16,6 +16,11 @@ import "bytes"
 import "os"
 import "bufio"
 
+// challenge 6
+import "math"
+import "strings"
+import "io/ioutil"
+
 func main() {
 
 }
@@ -143,3 +148,84 @@ func repeatingKeyXOR(msg string, key string) []byte{
   }
   return result
 }
+
+// challenge 6
+func breakRepeatingKeyXOR(filePath string) {
+  distances := make([]float64, 38)
+  //loop over key-lenghts
+  for i := 2; i < 40; i++ {
+    // find key length
+    in, err := ioutil.ReadFile(filePath)
+    if (err != nil) {
+      fmt.Println(err)
+    }
+    data, err := base64.StdEncoding.DecodeString(string(in))
+    if (err != nil) {
+      fmt.Println(err)
+    }
+
+    cipher := string(data)
+    dist1 := calcHammingDist(cipher[0:i], cipher[i:2*i])
+    dist2 := calcHammingDist(cipher[61:61+i], cipher[61+i:61+(2*i)])
+    dist3 := calcHammingDist(cipher[121:121+i], cipher[121+i:121+(2*i)])
+
+    resDist := (float64(dist1 + dist2 + dist3)/float64(3))/float64(i)
+
+    distances[i-2] = resDist
+  }
+  // find minimal distance:
+  bestDist := float64(1000000)
+  bestElem := 0
+  for i := 2; i < len(distances)+2; i++ {
+    if (distances[i-2] < float64(bestDist)) {
+      bestDist = distances[i-2]
+      bestElem = i
+    }
+  }
+  fmt.Println(bestElem)
+  // bestElem = key-length
+
+  // brake in blocks of length-elements: list[0::length]
+
+}
+
+func calcHammingDist(in1 string, in2 string) int {
+  bin1 := stringToBin(in1)
+  bin2 := stringToBin(in2)
+  minLen := math.Min(float64(len(bin1)), float64(len(bin2)))
+  hammingDistance := 0
+
+  for i := 0; i < int(minLen); i++ {
+    if (bin1[i] != bin2[i]) {
+      hammingDistance++
+    }
+  }
+  // calculate number of ones in the rest (longer-shorter) of the longer string
+  ones := 0
+  if (len(bin1) > len(bin2)) {
+    tmp := bin1[int(minLen):len(bin1)]
+    ones = strings.Count(tmp, "1");
+  } else {
+    tmp := bin2[int(minLen):len(bin2)]
+    ones = strings.Count(tmp, "1");
+  }
+  hammingDistance += ones
+  return hammingDistance
+}
+
+func stringToBin(in string) (out string) {
+  for _, c := range in {
+    out = fmt.Sprintf("%s%.8b", out, c)
+  }
+  return
+}
+
+
+
+
+
+
+
+
+
+//
