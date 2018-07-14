@@ -151,38 +151,32 @@ func repeatingKeyXOR(msg string, key string) []byte{
 
 // challenge 6
 func breakRepeatingKeyXOR(filePath string) {
-  distances := make([]float64, 38)
+  in, err := ioutil.ReadFile(filePath)
+  if (err != nil) {
+    fmt.Println(err)
+  }
+  data, err := base64.StdEncoding.DecodeString(string(in))
+  if (err != nil) {
+    fmt.Println(err)
+  }
+  cypher := string(data)
+
   //loop over key-lenghts
+  bestDist := math.MaxFloat64
+  keyLength := 0
   for i := 2; i < 40; i++ {
     // find key length
-    in, err := ioutil.ReadFile(filePath)
-    if (err != nil) {
-      fmt.Println(err)
-    }
-    data, err := base64.StdEncoding.DecodeString(string(in))
-    if (err != nil) {
-      fmt.Println(err)
-    }
+    dist1 := calcHammingDist(cypher[:4*i], cypher[4*i:2*4*i])
+    dist2 := calcHammingDist(cypher[2*4*i:3*4*i], cypher[3*4*i:4*4*i])
 
-    cipher := string(data)
-    dist1 := calcHammingDist(cipher[0:i], cipher[i:2*i])
-    dist2 := calcHammingDist(cipher[61:61+i], cipher[61+i:61+(2*i)])
-    dist3 := calcHammingDist(cipher[121:121+i], cipher[121+i:121+(2*i)])
+    resDist := ((float64(dist1 + dist2))/float64(5))/float64(i)
 
-    resDist := (float64(dist1 + dist2 + dist3)/float64(3))/float64(i)
-
-    distances[i-2] = resDist
-  }
-  // find minimal distance:
-  bestDist := float64(1000000)
-  bestElem := 0
-  for i := 2; i < len(distances)+2; i++ {
-    if (distances[i-2] < float64(bestDist)) {
-      bestDist = distances[i-2]
-      bestElem = i
+    if resDist < bestDist {
+      bestDist = resDist
+      keyLength = i
     }
   }
-  fmt.Println(bestElem)
+  fmt.Println("probable length:", keyLength)
   // bestElem = key-length
 
   // brake in blocks of length-elements: list[0::length]
@@ -204,10 +198,10 @@ func calcHammingDist(in1 string, in2 string) int {
   ones := 0
   if (len(bin1) > len(bin2)) {
     tmp := bin1[int(minLen):len(bin1)]
-    ones = strings.Count(tmp, "1");
+    ones = strings.Count(string(tmp), "1");
   } else {
     tmp := bin2[int(minLen):len(bin2)]
-    ones = strings.Count(tmp, "1");
+    ones = strings.Count(string(tmp), "1");
   }
   hammingDistance += ones
   return hammingDistance
