@@ -9,6 +9,8 @@ import "testing"
 import "bytes"
 import "encoding/hex"
 
+import "strings"
+
 func TestChallenge1(t *testing.T) {
   res := hextobase64("49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d")
   if res != "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t" {
@@ -35,9 +37,13 @@ func TestChallenge2(t *testing.T) {
 }
 
 func TestChallenge3(t *testing.T) {
-  res := singleByteXORCipher("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736")
-  if res != "Cooking MC's like a pound of bacon" {
-    t.Error("c3: wrong result", res)
+  hex, err := hex.DecodeString("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736")
+  if err != nil {
+    t.Fatal(err)
+  }
+  res := singleByteXORCipher(hex)
+  if bytes.Compare(res, []byte("Cooking MC's like a pound of bacon")) != 0 {
+    t.Error("c3: wrong result", res, []byte("Cooking MC's like a pound of bacon"))
   }
 }
 
@@ -56,16 +62,8 @@ func TestChallenge5(t *testing.T) {
   }
 }
 
-func TestStringToBin(t *testing.T) {
-  res := stringToBin("abc")
-
-  if res != "011000010110001001100011" {
-    t.Error("c6/stringToBin: wrong result", res)
-  }
-}
-
 func TestCalcHammingDist(t *testing.T) {
-  res := calcHammingDist("this is a test", "wokka wokka!!!")
+  res := calcHammingDist([]byte("this is a test"), []byte("wokka wokka!!!"))
 
   if res != 37 {
     t.Error("c6/calcHammingDist: wrong result", res)
@@ -73,5 +71,13 @@ func TestCalcHammingDist(t *testing.T) {
 }
 
 func TestChallenge6(t *testing.T) {
-  breakRepeatingKeyXOR("./6.txt")
+  res := findRepeatingKeyXORKey("./6.txt")
+  if res != "Terminator X: Bring the noise" {
+    t.Error("c6: wrong result", res)
+  }
+  plaintext := decipherRepeatingKeyXORWithKey("./6.txt", res)
+  correctPlaintextPrefix := "I'm back and I'm ringin' the bell"
+  if !strings.HasPrefix(plaintext, correctPlaintextPrefix){
+    t.Error("c6: wrong result", plaintext[:len(correctPlaintextPrefix)])
+  }
 }

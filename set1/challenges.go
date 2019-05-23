@@ -18,7 +18,7 @@ import "bufio"
 
 // challenge 6
 import "math"
-import "strings"
+import "math/bits"
 import "io/ioutil"
 
 func main() {
@@ -48,62 +48,73 @@ func fixedXOR(in1 []byte, in2 []byte) []byte {
 }
 
 // challenge 3
-func singleByteXORCipherWithScore(in string) (string,int) {
-  in_hex, err := hex.DecodeString(in)
-  if err != nil {
-    fmt.Println(err)
-  }
-
-  in_arr := []byte(in_hex)
-  r := 'a'
-  r = 33
+func singleByteXORCipherWithScore(in []byte) ([]byte,byte,int) {
+  // starting point r=32 because 32(dec) = 20(hex) = SP(ascii) which is the first "interesting" character
+  r := 32
 
   best_score := 0
-  best_result := make([]byte, len(in_hex))
+  best_result := make([]byte, len(in))
+  best_key := byte(r)
   // loop over all characters:
+  // end point r=126 because 126(dec) = 7E(hex) = ~(ascii) which is the last "interesting" character
   for ;r < 127; r++ {
     // create byte slice with same length as in and all characters are r:
-    arr := make([]byte, len(in_arr))
-    for i := 0; i < len(in_arr); i++ {
+    arr := make([]byte, len(in))
+    for i := 0; i < len(in); i++ {
       arr[i] = byte(r)
     }
     // XOR the two byte slices
-    result := fixedXOR(arr, in_arr)
+    result := fixedXOR(arr, in)
 
     // score the result:
     score := 0
     for i := 0; i < len(result); i++ {
       char := result[i:i+1]
+      if (bytes.Equal(char, []byte(" "))) {score += 130}
       if (bytes.Equal(char, []byte("e"))) {score += 127}
+      if (bytes.Equal(char, []byte("E"))) {score += 127}
       if (bytes.Equal(char, []byte("t"))) {score += 90}
+      if (bytes.Equal(char, []byte("T"))) {score += 90}
+      if (bytes.Equal(char, []byte("."))) {score += 85}
       if (bytes.Equal(char, []byte("a"))) {score += 82}
+      if (bytes.Equal(char, []byte("A"))) {score += 82}
       if (bytes.Equal(char, []byte("o"))) {score += 75}
+      if (bytes.Equal(char, []byte("O"))) {score += 75}
       if (bytes.Equal(char, []byte("i"))) {score += 70}
+      if (bytes.Equal(char, []byte("I"))) {score += 70}
       if (bytes.Equal(char, []byte("n"))) {score += 67}
+      if (bytes.Equal(char, []byte("N"))) {score += 67}
       if (bytes.Equal(char, []byte("s"))) {score += 63}
+      if (bytes.Equal(char, []byte("S"))) {score += 63}
       if (bytes.Equal(char, []byte("h"))) {score += 61}
+      if (bytes.Equal(char, []byte("H"))) {score += 61}
       if (bytes.Equal(char, []byte("r"))) {score += 60}
+      if (bytes.Equal(char, []byte("R"))) {score += 60}
       if (bytes.Equal(char, []byte("d"))) {score += 43}
-
-      if (bytes.Equal(char, []byte("*"))) {score -= 100}
+      if (bytes.Equal(char, []byte("D"))) {score += 43}
+      if (bytes.Equal(char, []byte("l"))) {score += 40}
+      if (bytes.Equal(char, []byte("c"))) {score += 28}
+      if (bytes.Equal(char, []byte("u"))) {score += 27}
+      if (bytes.Equal(char, []byte("m"))) {score += 24}
+      if (bytes.Equal(char, []byte("w"))) {score += 23}
     }
 
     if (score > best_score) {
       best_result = result
       best_score = score
+      best_key = byte(r)
     }
 
   }
-  return string(best_result[:len(in_arr)]),best_score
+  return best_result[:len(in)],best_key,best_score
 }
 
-
-// challenge 4
-func singleByteXORCipher(in string) string {
-  res, _ := singleByteXORCipherWithScore(in)
+func singleByteXORCipher(in []byte) []byte {
+  res,_,_ := singleByteXORCipherWithScore(in)
   return res
 }
 
+// challenge 4
 func detectSingleCharacterXOR(in string) int {
   inData, err := os.Open(in)
   if (err != nil) {
@@ -116,7 +127,7 @@ func detectSingleCharacterXOR(in string) int {
   counter := 1
   counter_at_highest_score := 0
   for scanner.Scan() {
-    _,score := singleByteXORCipherWithScore(scanner.Text())
+    _,_,score := singleByteXORCipherWithScore([]byte(scanner.Text()))
     if (score > highest_score) {
       highest_score = score
       counter_at_highest_score = counter
@@ -150,7 +161,7 @@ func repeatingKeyXOR(msg string, key string) []byte{
 }
 
 // challenge 6
-func breakRepeatingKeyXOR(filePath string) {
+func findRepeatingKeyXORKey(filePath string) string{
   in, err := ioutil.ReadFile(filePath)
   if (err != nil) {
     fmt.Println(err)
@@ -159,64 +170,73 @@ func breakRepeatingKeyXOR(filePath string) {
   if (err != nil) {
     fmt.Println(err)
   }
-  cypher := string(data)
 
   //loop over key-lenghts
   bestDist := math.MaxFloat64
   keyLength := 0
   for i := 2; i < 40; i++ {
     // find key length
-    dist1 := calcHammingDist(cypher[:4*i], cypher[4*i:2*4*i])
-    dist2 := calcHammingDist(cypher[2*4*i:3*4*i], cypher[3*4*i:4*4*i])
+    dist1 := calcHammingDist(data[:4*i], data[4*i:2*4*i])
+    dist2 := calcHammingDist(data[2*4*i:3*4*i], data[3*4*i:4*4*i])
 
-    resDist := ((float64(dist1 + dist2))/float64(5))/float64(i)
+    resDist := ((float64(dist1 + dist2))/float64(2))/float64(i)
 
     if resDist < bestDist {
       bestDist = resDist
       keyLength = i
     }
   }
-  fmt.Println("probable length:", keyLength)
-  // bestElem = key-length
 
-  // brake in blocks of length-elements: list[0::length]
+  numberOfBlocks := (len(data)/keyLength)+1
+  blocks := make([][]byte, keyLength)
+  for i := range blocks {
+    blocks[i] = make([]byte, numberOfBlocks)
+  }
 
-}
+  dataElement := 0
+  for j := 0; j < numberOfBlocks; j++ {
+    for i := 0; i < keyLength; i++ {
 
-func calcHammingDist(in1 string, in2 string) int {
-  bin1 := stringToBin(in1)
-  bin2 := stringToBin(in2)
-  minLen := math.Min(float64(len(bin1)), float64(len(bin2)))
-  hammingDistance := 0
-
-  for i := 0; i < int(minLen); i++ {
-    if (bin1[i] != bin2[i]) {
-      hammingDistance++
+      if dataElement < len(data) {
+        blocks[i][j] = data[dataElement]
+        dataElement++
+      }
     }
   }
-  // calculate number of ones in the rest (longer-shorter) of the longer string
-  ones := 0
-  if (len(bin1) > len(bin2)) {
-    tmp := bin1[int(minLen):len(bin1)]
-    ones = strings.Count(string(tmp), "1");
-  } else {
-    tmp := bin2[int(minLen):len(bin2)]
-    ones = strings.Count(string(tmp), "1");
+
+  key := make([]byte, keyLength)
+  for i := 0; i < keyLength; i++ {
+    _,k,_ := singleByteXORCipherWithScore(blocks[i])
+    key[i] = k
   }
-  hammingDistance += ones
+  return string(key)
+}
+
+func calcHammingDist(in1, in2 []byte) int {
+  if len(in1) != len(in2) {
+    panic("calcHammingDist: inputs must have same length")
+  }
+  hammingDistance := 0
+
+  for i := 0; i < len(in1); i++ {
+    hammingDistance += bits.OnesCount8(in1[i] ^ in2[i])
+  }
   return hammingDistance
 }
 
-func stringToBin(in string) (out string) {
-  for _, c := range in {
-    out = fmt.Sprintf("%s%.8b", out, c)
+func decipherRepeatingKeyXORWithKey(filePath string, key string) string{
+  in, err := ioutil.ReadFile(filePath)
+  if (err != nil) {
+    fmt.Println(err)
   }
-  return
+  data, err := base64.StdEncoding.DecodeString(string(in))
+  if (err != nil) {
+    fmt.Println(err)
+  }
+
+  plaintext := string(repeatingKeyXOR(string(data), key))
+  return plaintext
 }
-
-
-
-
 
 
 
