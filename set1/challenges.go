@@ -21,6 +21,9 @@ import "math"
 import "math/bits"
 import "io/ioutil"
 
+// challenge 7
+import "crypto/aes"
+
 func main() {
 
 }
@@ -238,6 +241,19 @@ func decipherRepeatingKeyXORWithKey(filePath string, key string) string{
   return plaintext
 }
 
+// challenge 7
+func decryptAesEcb(key, cipher []byte) []byte{
+  keysize := len(key)
+  block, err := aes.NewCipher(key)
+  if (err != nil) {
+    fmt.Println(err)
+  }
+  res := make([]byte, len(cipher))
+  for i := 0; i < len(cipher) - keysize; i += keysize {
+    block.Decrypt(res[i:i+keysize], cipher[i:i+keysize])
+  }
+  return res
+}
 
 
 

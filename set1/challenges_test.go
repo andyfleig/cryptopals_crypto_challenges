@@ -9,7 +9,13 @@ import "testing"
 import "bytes"
 import "encoding/hex"
 
+// challenge 6
 import "strings"
+
+// challenge 7
+import "io/ioutil"
+import "fmt"
+import "encoding/base64"
 
 func TestChallenge1(t *testing.T) {
   res := hextobase64("49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d")
@@ -78,6 +84,26 @@ func TestChallenge6(t *testing.T) {
   plaintext := decipherRepeatingKeyXORWithKey("./6.txt", res)
   correctPlaintextPrefix := "I'm back and I'm ringin' the bell"
   if !strings.HasPrefix(plaintext, correctPlaintextPrefix){
+    t.Error("c6: wrong result", plaintext[:len(correctPlaintextPrefix)])
+  }
+}
+
+func TestChallenge7(t *testing.T) {
+  key := []byte("YELLOW SUBMARINE")
+
+  in, err := ioutil.ReadFile("./7.txt")
+  if (err != nil) {
+    fmt.Println(err)
+  }
+
+  ciphertext, err := base64.StdEncoding.DecodeString(string(in))
+  if (err != nil) {
+    fmt.Println(err)
+  }
+
+  plaintext := decryptAesEcb(key, ciphertext)
+  correctPlaintextPrefix := "I'm back and I'm ringin' the bell"
+  if !strings.HasPrefix(string(plaintext), correctPlaintextPrefix){
     t.Error("c6: wrong result", plaintext[:len(correctPlaintextPrefix)])
   }
 }
