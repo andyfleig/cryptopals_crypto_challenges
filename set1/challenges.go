@@ -164,16 +164,7 @@ func repeatingKeyXOR(msg string, key string) []byte{
 }
 
 // challenge 6
-func findRepeatingKeyXORKey(filePath string) string{
-  in, err := ioutil.ReadFile(filePath)
-  if (err != nil) {
-    fmt.Println(err)
-  }
-  data, err := base64.StdEncoding.DecodeString(string(in))
-  if (err != nil) {
-    fmt.Println(err)
-  }
-
+func findRepeatingKeyXORKey(data []byte) string{
   //loop over key-lenghts
   bestDist := math.MaxFloat64
   keyLength := 0
@@ -255,7 +246,23 @@ func decryptAesEcb(key, cipher []byte) []byte{
   return res
 }
 
-
-
-
-//
+// challenge 8
+func isAesEcb(cipher []byte, blocksize int) bool {
+  if len(cipher)%blocksize != 0 {
+    return false
+  }
+  known_blocks := make(map[string]struct{})
+  // find cipher blocks with multiple occurrences
+  for i := 0; i < len(cipher) - blocksize; i += blocksize {
+    block := cipher[i:i+blocksize]
+    _, ok := known_blocks[string(block)]
+    if ok {
+      // multiple occurrence -> it is indeed AES ECB encrypted
+      return true
+    } else {
+      // first occurrence -> add to map
+      known_blocks[string(block)] = struct{}{}
+    }
+  }
+  return false
+}

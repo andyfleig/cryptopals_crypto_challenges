@@ -17,6 +17,10 @@ import "io/ioutil"
 import "fmt"
 import "encoding/base64"
 
+// challenge 8
+import "bufio"
+import "os"
+
 func TestChallenge1(t *testing.T) {
   res := hextobase64("49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d")
   if res != "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t" {
@@ -77,7 +81,15 @@ func TestCalcHammingDist(t *testing.T) {
 }
 
 func TestChallenge6(t *testing.T) {
-  res := findRepeatingKeyXORKey("./6.txt")
+  in, err := ioutil.ReadFile("./6.txt")
+  if (err != nil) {
+    fmt.Println(err)
+  }
+  data, err := base64.StdEncoding.DecodeString(string(in))
+  if (err != nil) {
+    fmt.Println(err)
+  }
+  res := findRepeatingKeyXORKey(data)
   if res != "Terminator X: Bring the noise" {
     t.Error("c6: wrong result", res)
   }
@@ -105,5 +117,35 @@ func TestChallenge7(t *testing.T) {
   correctPlaintextPrefix := "I'm back and I'm ringin' the bell"
   if !strings.HasPrefix(string(plaintext), correctPlaintextPrefix){
     t.Error("c6: wrong result", plaintext[:len(correctPlaintextPrefix)])
+  }
+}
+
+func TestChallenge8(t *testing.T) {
+  file, err := os.Open("./8.txt")
+  if err != nil {
+    fmt.Println(err)
+  }
+  defer file.Close()
+
+  reader := bufio.NewReader(file)
+
+  index := 0
+  for {
+    index++
+    line, err := reader.ReadString('\n')
+    if err != nil {
+      // break at EOF
+      break
+    }
+    hex, err := hex.DecodeString(line)
+    if isAesEcb([]byte(hex), 16) {
+      if index != 133 {
+        t.Error("c8: wrong result: index ", index)
+      }
+    } else {
+      if index == 133 {
+        t.Error("c8: correct encryption not detected: index ", index)
+      }
+    }
   }
 }
