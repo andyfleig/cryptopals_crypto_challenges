@@ -233,14 +233,17 @@ func decipherRepeatingKeyXORWithKey(filePath string, key string) string{
 }
 
 // challenge 7
-func decryptAesEcb(key, cipher []byte) []byte{
+func decryptAesEcb(key []byte, cipher []byte) []byte{
   keysize := len(key)
+  if len(cipher)%keysize != 0 {
+		panic("decryptAesEcb: cipher length is not multiple of keysize")
+	}
   block, err := aes.NewCipher(key)
   if (err != nil) {
     fmt.Println(err)
   }
   res := make([]byte, len(cipher))
-  for i := 0; i < len(cipher) - keysize; i += keysize {
+  for i := 0; i < len(cipher); i += keysize {
     block.Decrypt(res[i:i+keysize], cipher[i:i+keysize])
   }
   return res
@@ -253,7 +256,7 @@ func isAesEcb(cipher []byte, blocksize int) bool {
   }
   known_blocks := make(map[string]struct{})
   // find cipher blocks with multiple occurrences
-  for i := 0; i < len(cipher) - blocksize; i += blocksize {
+  for i := 0; i < len(cipher); i += blocksize {
     block := cipher[i:i+blocksize]
     _, ok := known_blocks[string(block)]
     if ok {
