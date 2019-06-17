@@ -50,3 +50,19 @@ func TestChallenge10(t *testing.T) {
     t.Error("c10: wrong result")
   }
 }
+
+func TestChallenge11(t *testing.T) {
+  number_of_tests := 1000
+  plaintext := []byte("In the town where I was born Lived a man who sailed to sea And he told us of his life In the land of submarines So we sailed up to the sun 'Til we found a sea of green And we lived beneath the waves In our yellow submarine We all live in a yellow submarine Yellow submarine, yellow submarine We all live in a yellow submarine Yellow submarine, yellow submarine And our friends are all aboard Many more of them live next door And the band begins to play We all live in a yellow submarine Yellow submarine, yellow submarine We all live in a yellow submarine Yellow submarine, yellow submarine As we live a life of ease Everyone of us has all we need (has all we need) Sky of blue (sky of blue) and sea of green (and sea of green) In our yellow submarine (in our yellow, submarine, ha ha) We all live in a yellow submarine Yellow submarine, yellow submarine We all live in a yellow submarine Yellow submarine, yellow submarine We all live in a yellow submarine Yellow submarine, yellow submarine We all live in a yellow submarine Yellow submarine, yellow submarine")
+  for i := 0; i < number_of_tests; i++ {
+    mode, cipher := encryptionOracle(plaintext)
+    detected_mode := decideEncryptionMethod(plaintext, cipher)
+    if detected_mode != mode {
+      msg := fmt.Sprintf("c11: detected %d but is %d", detected_mode, mode)
+      t.Error(msg)
+    }
+  }
+
+
+
+}

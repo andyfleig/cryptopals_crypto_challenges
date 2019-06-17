@@ -11,6 +11,11 @@ import "bytes"
 // challenge 10
 import "crypto/aes"
 
+// challenge 11
+import "math/rand"
+import "time"
+
+
 // challenge 9
 func addPkcsPadding(in []byte, blocksize int) []byte {
   if len(in)%blocksize == 0 {
@@ -34,6 +39,7 @@ func encryptAesEcb(key []byte, plaintext []byte) []byte{
   return res
 }
 
+// challenge 10
 func decryptAesCbc(key []byte, ciphertext []byte, iv []byte) []byte{
   blocksize := len(key)
   if len(ciphertext)%blocksize != 0 {
@@ -62,4 +68,45 @@ func encryptAesCbc(key []byte, plaintext []byte, iv []byte) []byte{
     iv = current_cipher
   }
   return result
+}
+
+// challenge 11
+func createRandomAesKey() []byte {
+  random_key := make([]byte, 16)
+  rand.Seed(time.Now().UnixNano())
+  rand.Read(random_key)
+  return random_key
+}
+
+func encryptionOracle(plaintext []byte) (int, []byte) {
+  rand.Seed(time.Now().UnixNano())
+  // create random numbers between 5 and 10 (rand.Intn(6) creates random number in [0,6))
+  prefix_length := rand.Intn(6) + 5
+  suffix_length := rand.Intn(6) + 5
+  random_prefix := make([]byte, prefix_length)
+  rand.Read(random_prefix)
+  radnom_suffix := make([]byte, suffix_length)
+  rand.Read(radnom_suffix)
+  input := append(append(random_prefix, plaintext...), radnom_suffix...)
+  input = addPkcsPadding(input, 16)
+
+  // randomly choose encryption method (ECB/CBC)
+  enc_method := rand.Intn(2)
+  key := createRandomAesKey()
+  if enc_method != 0 && enc_method != 1 {
+    fmt.Println("ERROR")
+  }
+  if enc_method == 0 {
+    return 0, encryptAesCbc(key, input, createRandomAesKey())
+  } else {
+    return 1, encryptAesEcb(key, input)
+  }
+}
+
+func decideEncryptionMethod(plaintext []byte, cipher []byte) int {
+  if isAesEcb(cipher, 16) {
+    return 1
+  } else {
+    return 0
+  }
 }
