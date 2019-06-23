@@ -16,7 +16,7 @@ import (
 )
 
 func TestChallenge9(t *testing.T) {
-	res := addPkcsPadding([]byte("YELLOW SUBMARINE"), 20)
+	res := addPKCSPadding([]byte("YELLOW SUBMARINE"), 20)
 	if string(res) != "YELLOW SUBMARINE\x04\x04\x04\x04" {
 		t.Error("c9: wrong result", res)
 	}
@@ -25,8 +25,8 @@ func TestChallenge9(t *testing.T) {
 func TestEncryptAesEcb(t *testing.T) {
 	key := []byte("YELLOW SUBMARINE")
 	plaintext := []byte("I'm back and I'm ringin' the bel")
-	res := encryptAesEcb(key, plaintext)
-	result := decryptAesEcb(key, res)
+	res := encryptAESECB(key, plaintext)
+	result := decryptAESECB(key, res)
 	if string(result) != string(plaintext) {
 		t.Error("c10: wrong result:", string(result))
 	}
@@ -46,8 +46,8 @@ func TestChallenge10(t *testing.T) {
 		fmt.Println(err)
 	}
 
-	plaintext := decryptAesCbc(key, ciphertext, iv)
-	result := encryptAesCbc(key, plaintext, iv)
+	plaintext := decryptAESCBC(key, ciphertext, iv)
+	result := encryptAESCBC(key, plaintext, iv)
 
 	if string(result) != string(ciphertext) {
 		t.Error("c10: wrong result")
@@ -65,5 +65,4 @@ func TestChallenge11(t *testing.T) {
 			t.Error(msg)
 		}
 	}
-
 }

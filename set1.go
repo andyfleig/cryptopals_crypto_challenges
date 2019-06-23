@@ -230,7 +230,7 @@ func repeatingKeyXOR(msg string, key string) []byte {
 }
 
 // challenge 6
-func findRepeatingKeyXORKey(data []byte) string {
+func findRepeatingKeyXORSize(data []byte) int {
 	//loop over key-lengths
 	bestDist := math.MaxFloat64
 	keyLength := 0
@@ -246,6 +246,11 @@ func findRepeatingKeyXORKey(data []byte) string {
 			keyLength = i
 		}
 	}
+	return keyLength
+}
+
+func findRepeatingKeyXORKey(data []byte) string {
+	keyLength := findRepeatingKeyXORSize(data)
 
 	numberOfBlocks := (len(data) / keyLength) + 1
 	blocks := make([][]byte, keyLength)
@@ -299,10 +304,10 @@ func decipherRepeatingKeyXORWithKey(filePath string, key string) string {
 }
 
 // challenge 7
-func decryptAesEcb(key []byte, cipher []byte) []byte {
+func decryptAESECB(key []byte, cipher []byte) []byte {
 	keySize := len(key)
 	if len(cipher)%keySize != 0 {
-		panic("decryptAesEcb: cipher length is not multiple of keySize")
+		panic("decryptAESECB: cipher length is not multiple of keySize")
 	}
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -316,7 +321,7 @@ func decryptAesEcb(key []byte, cipher []byte) []byte {
 }
 
 // challenge 8
-func isAesEcb(cipher []byte, blockSize int) bool {
+func isAESECB(cipher []byte, blockSize int) bool {
 	if len(cipher)%blockSize != 0 {
 		return false
 	}

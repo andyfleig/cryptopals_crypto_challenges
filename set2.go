@@ -4,6 +4,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 )
 
@@ -23,8 +24,12 @@ import (
 	"time"
 )
 
+var (
+	randomKey12 []byte
+)
+
 // challenge 9
-func addPkcsPadding(in []byte, blockSize int) []byte {
+func addPKCSPadding(in []byte, blockSize int) []byte {
 	if len(in)%blockSize == 0 {
 		return in
 	}
@@ -33,7 +38,7 @@ func addPkcsPadding(in []byte, blockSize int) []byte {
 	return append(in, padding...)
 }
 
-func encryptAesEcb(key []byte, plaintext []byte) []byte {
+func encryptAESECB(key []byte, plaintext []byte) []byte {
 	keySize := len(key)
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -47,30 +52,30 @@ func encryptAesEcb(key []byte, plaintext []byte) []byte {
 }
 
 // challenge 10
-func decryptAesCbc(key []byte, ciphertext []byte, iv []byte) []byte {
+func decryptAESCBC(key []byte, ciphertext []byte, iv []byte) []byte {
 	blockSize := len(key)
 	if len(ciphertext)%blockSize != 0 {
-		panic("decryptAesEcb: cipher length is not multiple of keySize")
+		panic("decryptAESECB: cipher length is not multiple of keySize")
 	}
 
 	result := []byte("")
 	for i := 0; i < len(ciphertext); i += blockSize {
 		currentBlock := ciphertext[i : i+blockSize]
-		currentPlain := fixedXOR(decryptAesEcb(key, currentBlock), iv)
+		currentPlain := fixedXOR(decryptAESECB(key, currentBlock), iv)
 		result = append(result, currentPlain...)
 		iv = currentBlock
 	}
 	return result
 }
 
-func encryptAesCbc(key []byte, plaintext []byte, iv []byte) []byte {
+func encryptAESCBC(key []byte, plaintext []byte, iv []byte) []byte {
 	blockSize := len(key)
-	plaintext = addPkcsPadding(plaintext, blockSize)
+	plaintext = addPKCSPadding(plaintext, blockSize)
 
 	result := []byte("")
 	for i := 0; i < len(plaintext); i += blockSize {
 		currentBlock := plaintext[i : i+blockSize]
-		currentCipher := encryptAesEcb(key, fixedXOR(currentBlock, iv))
+		currentCipher := encryptAESECB(key, fixedXOR(currentBlock, iv))
 		result = append(result, currentCipher...)
 		iv = currentCipher
 	}
@@ -78,7 +83,7 @@ func encryptAesCbc(key []byte, plaintext []byte, iv []byte) []byte {
 }
 
 // challenge 11
-func createRandomAesKey() []byte {
+func createRandomAESKey() []byte {
 	randomKey := make([]byte, 16)
 	rand.Seed(time.Now().UnixNano())
 	rand.Read(randomKey)
@@ -95,20 +100,19 @@ func encryptionOracle(plaintext []byte) (int, []byte) {
 	randomSuffix := make([]byte, suffixLength)
 	rand.Read(randomSuffix)
 	input := append(append(randomPrefix, plaintext...), randomSuffix...)
-	input = addPkcsPadding(input, 16)
+	input = addPKCSPadding(input, 16)
 
-	// randomly choose encryption method (ECB/CBC)
 	encMethod := rand.Intn(2)
-	key := createRandomAesKey()
+	key := createRandomAESKey()
 	if encMethod == 0 {
-		return 0, encryptAesCbc(key, input, createRandomAesKey())
+		return 0, encryptAESCBC(key, input, createRandomAESKey())
 	} else {
-		return 1, encryptAesEcb(key, input)
+		return 1, encryptAESECB(key, input)
 	}
 }
 
 func decideEncryptionMethod(cipher []byte) int {
-	if isAesEcb(cipher, 16) {
+	if isAESECB(cipher, 16) {
 		return 1
 	} else {
 		return 0

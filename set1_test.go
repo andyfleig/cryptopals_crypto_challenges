@@ -119,7 +119,7 @@ func TestChallenge7(t *testing.T) {
 		fmt.Println(err)
 	}
 
-	plaintext := decryptAesEcb(key, ciphertext)
+	plaintext := decryptAESECB(key, ciphertext)
 	correctPlaintextPrefix := "I'm back and I'm ringin' the bell"
 	if !strings.HasPrefix(string(plaintext), correctPlaintextPrefix) {
 		t.Error("c6: wrong result", plaintext[:len(correctPlaintextPrefix)])
@@ -144,7 +144,7 @@ func TestChallenge8(t *testing.T) {
 			break
 		}
 		hexIn, err := hex.DecodeString(line)
-		if isAesEcb([]byte(hexIn), 16) {
+		if isAESECB([]byte(hexIn), 16) {
 			if index != 133 {
 				t.Error("c8: wrong result: index ", index)
 			}
