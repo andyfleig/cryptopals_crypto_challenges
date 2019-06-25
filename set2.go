@@ -24,6 +24,8 @@ import (
 	"time"
 )
 
+// challenge 12
+
 var (
 	randomKey12 []byte
 )
@@ -117,4 +119,59 @@ func decideEncryptionMethod(cipher []byte) int {
 	} else {
 		return 0
 	}
+}
+
+// challenge 12
+func encryptECBUnderRandomKey(buffer []byte) []byte {
+	s := "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK"
+	secret, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		fmt.Println("Error decoding string.")
+	}
+	input := addPKCSPadding(append(buffer, secret...), 16)
+
+	if len(randomKey12) == 0 {
+		randomKey12 = createRandomAESKey()
+	}
+	return encryptAESECB(randomKey12, input)
+}
+
+func decryptRandomKeyECB() []byte {
+	// 1&2: detect blockSize and that it actually is ECB
+	// has to start with blockSize = 2
+	// has to be double the size since two following blocks have to be identical to detect via isAESECB
+	buffer := []byte("AAAA")
+	encBuf := encryptECBUnderRandomKey(buffer)
+	var blockSize int
+	for blockSize = 2; blockSize < 100; blockSize++ {
+		if isAESECB(encBuf, blockSize) {
+			break
+		}
+		buffer = append(buffer, "AA"...)
+		encBuf = encryptECBUnderRandomKey(buffer)
+	}
+
+	deciphered := ""
+	for i := 0; i < len(encryptECBUnderRandomKey([]byte{})); i++ {
+		blockNumber := int(i / blockSize)
+		blockOffset := blockNumber * blockSize
+		// 3. crafting input block which is one byte short
+		dummy := bytes.Repeat([]byte("A"), blockSize-(i%blockSize)-1)
+		inBlock := append(dummy, []byte(deciphered)...)
+
+		// 4. create dictionary
+		dict := make(map[string]string)
+		for j := 0; j < 256; j++ {
+			cur := append(inBlock, []byte(string(j))...)
+			cur = encryptECBUnderRandomKey(cur)[blockOffset : blockOffset+blockSize]
+			dict[string(cur)] = string(j)
+		}
+		character, ok := dict[string(encryptECBUnderRandomKey(dummy)[blockOffset:blockOffset+blockSize])]
+		if ok {
+			deciphered += character
+		} else {
+			fmt.Println("Error: no entry found in dict!")
+		}
+	}
+	return []byte(deciphered)
 }
