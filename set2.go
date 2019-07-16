@@ -6,6 +6,8 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
+	"log"
+	"strings"
 )
 
 // challenge 9
@@ -25,9 +27,13 @@ import (
 )
 
 // challenge 12
-
 var (
 	randomKey12 []byte
+)
+
+// challenge 13
+var (
+	randomKey13 []byte
 )
 
 // challenge 9
@@ -174,4 +180,90 @@ func decryptRandomKeyECB() []byte {
 		}
 	}
 	return []byte(deciphered)
+}
+
+// challenge 13
+func parseKeyValueString(kvString string) string {
+	parts := strings.Split(kvString, "&")
+	result := "{"
+	for _, part := range parts {
+		kv := strings.Split(part, "=")
+		if len(kv) != 2 {
+			log.Fatal("Invalid kv-string!")
+		}
+		result += kv[0] + ": " + "'" + kv[1] + "',"
+	}
+	// cut off tailing comma and add final "}"
+	result = result[:len(result)-1] + "}"
+	return result
+}
+
+func profileFor(email string) string {
+	// remove meta chars ("&" and "="):
+	email = strings.ReplaceAll(email, "&", "")
+	email = strings.ReplaceAll(email, "=", "")
+
+	var parts []string
+	parts = append(parts, "email="+email)
+	parts = append(parts, "uid="+"10")
+	parts = append(parts, "role="+"user")
+	result := ""
+	for _, part := range parts {
+		result += part + "&"
+	}
+	return result[:len(result)-1]
+}
+
+func encryptUserProfile(userProfile string, key []byte) []byte {
+	return encryptAESECB(key, addPKCSPadding([]byte(userProfile), aes.BlockSize))
+}
+func encryptUserProfileUnderRandomKey(userProfile string) []byte {
+	if len(randomKey13) == 0 {
+		randomKey13 = createRandomAESKey()
+	}
+	return encryptUserProfile(userProfile, randomKey13)
+}
+
+func decryptUserProfile(cipher []byte, key []byte) string {
+	return string(decryptAESECB(key, cipher))
+}
+
+func decryptUserProfileUnderRandomKey(cipher []byte) string {
+	if len(randomKey13) == 0 {
+		randomKey13 = createRandomAESKey()
+	}
+	return string(removePKCSPadding([]byte(decryptUserProfile(cipher, randomKey13))))
+}
+
+func removePKCSPadding(in []byte) []byte {
+	ctr := 0
+	for in[len(in)-1] == []byte("\x04")[0] {
+		in = in[:len(in)-1]
+		ctr++
+		if ctr == aes.BlockSize {
+			log.Fatal("Padding must not be longer than one block!")
+		}
+	}
+	return in
+}
+
+func createAdminProfile() []byte {
+	// fixed layout since the content of the profile is fixed except for the mail which is attacker controlled
+	// idea:
+	// 1) create a block (somewhere within the encrypted profile) containing the word "admin" and the rest of the block is the padding element "\x04"
+	// 2) create a profile where the "user" part is in the beginning of the last block (so the second last block ends with "role="
+	// 3) add the block from 1 to the end to create a part "role=admin" for the user
+	// email=dummydummyadmin00000000000123&uid=10&role=user
+	// |-blocksize=16-||-blocksize=16-||-blocksize=16-|
+	dummyProfile := []byte("dummydummyadmin")
+	dummyProfile = append(dummyProfile, bytes.Repeat([]byte("\x04"), 11)...)
+	dummyProfile = append(dummyProfile, []byte("123")...)
+	dummyCipher := encryptUserProfileUnderRandomKey(profileFor(string(dummyProfile)))
+	adminBlock := dummyCipher[16:32]
+
+	// 19 is the length of the profile with an empty mail and without a user role ("email=&uid=10&role=")
+	email := bytes.Repeat([]byte("a"), 2*aes.BlockSize-19)
+	cipher := encryptUserProfileUnderRandomKey(profileFor(string(email)))
+	cipher = append(cipher[:len(cipher)-aes.BlockSize], adminBlock...)
+	return cipher
 }
