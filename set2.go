@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
+	"math/rand"
 	"strings"
 )
 
@@ -22,9 +23,10 @@ import (
 
 // challenge 11
 import (
-	"math/rand"
 	"time"
 )
+
+var aesBlockSize = 16
 
 // challenge 12
 var (
@@ -34,6 +36,11 @@ var (
 // challenge 13
 var (
 	randomKey13 []byte
+)
+
+// challenge 14
+var (
+	randLength int
 )
 
 // challenge 9
@@ -92,7 +99,7 @@ func encryptAESCBC(key []byte, plaintext []byte, iv []byte) []byte {
 
 // challenge 11
 func createRandomAESKey() []byte {
-	randomKey := make([]byte, 16)
+	randomKey := make([]byte, aesBlockSize)
 	rand.Seed(time.Now().UnixNano())
 	rand.Read(randomKey)
 	return randomKey
@@ -108,7 +115,7 @@ func encryptionOracle(plaintext []byte) (int, []byte) {
 	randomSuffix := make([]byte, suffixLength)
 	rand.Read(randomSuffix)
 	input := append(append(randomPrefix, plaintext...), randomSuffix...)
-	input = addPKCSPadding(input, 16)
+	input = addPKCSPadding(input, aesBlockSize)
 
 	encMethod := rand.Intn(2)
 	key := createRandomAESKey()
@@ -120,7 +127,7 @@ func encryptionOracle(plaintext []byte) (int, []byte) {
 }
 
 func decideEncryptionMethod(cipher []byte) int {
-	if isAESECB(cipher, 16) {
+	if isAESECB(cipher, aesBlockSize) {
 		return 1
 	} else {
 		return 0
@@ -128,37 +135,37 @@ func decideEncryptionMethod(cipher []byte) int {
 }
 
 // challenge 12
-func encryptECBUnderRandomKey(buffer []byte) []byte {
+func encryptECBUnderRandomKeyWithTailingSecret(buffer []byte) []byte {
 	s := "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK"
 	secret, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
 		fmt.Println("Error decoding string.")
 	}
-	input := addPKCSPadding(append(buffer, secret...), 16)
-
+	// input is (given buffer || secret string)
+	input := addPKCSPadding(append(buffer, secret...), aesBlockSize)
 	if len(randomKey12) == 0 {
 		randomKey12 = createRandomAESKey()
 	}
 	return encryptAESECB(randomKey12, input)
 }
 
-func decryptRandomKeyECB() []byte {
+func attackRandomKeyECBWithTailingSecret() []byte {
 	// 1&2: detect blockSize and that it actually is ECB
 	// has to start with blockSize = 2
 	// has to be double the size since two following blocks have to be identical to detect via isAESECB
 	buffer := []byte("AAAA")
-	encBuf := encryptECBUnderRandomKey(buffer)
+	encBuf := encryptECBUnderRandomKeyWithTailingSecret(buffer)
 	var blockSize int
 	for blockSize = 2; blockSize < 100; blockSize++ {
 		if isAESECB(encBuf, blockSize) {
 			break
 		}
 		buffer = append(buffer, "AA"...)
-		encBuf = encryptECBUnderRandomKey(buffer)
+		encBuf = encryptECBUnderRandomKeyWithTailingSecret(buffer)
 	}
 
 	deciphered := ""
-	for i := 0; i < len(encryptECBUnderRandomKey([]byte{})); i++ {
+	for i := 0; i < len(encryptECBUnderRandomKeyWithTailingSecret([]byte{})); i++ {
 		blockNumber := int(i / blockSize)
 		blockOffset := blockNumber * blockSize
 		// 3. crafting input block which is one byte short
@@ -169,14 +176,14 @@ func decryptRandomKeyECB() []byte {
 		dict := make(map[string]string)
 		for j := 0; j < 256; j++ {
 			cur := append(inBlock, []byte(string(j))...)
-			cur = encryptECBUnderRandomKey(cur)[blockOffset : blockOffset+blockSize]
+			cur = encryptECBUnderRandomKeyWithTailingSecret(cur)[blockOffset : blockOffset+blockSize]
 			dict[string(cur)] = string(j)
 		}
-		character, ok := dict[string(encryptECBUnderRandomKey(dummy)[blockOffset:blockOffset+blockSize])]
+		character, ok := dict[string(encryptECBUnderRandomKeyWithTailingSecret(dummy)[blockOffset:blockOffset+blockSize])]
 		if ok {
 			deciphered += character
 		} else {
-			fmt.Println("Error: no entry found in dict!")
+			log.Fatal("Error: no entry found in dict!")
 		}
 	}
 	return []byte(deciphered)
@@ -215,7 +222,7 @@ func profileFor(email string) string {
 }
 
 func encryptUserProfile(userProfile string, key []byte) []byte {
-	return encryptAESECB(key, addPKCSPadding([]byte(userProfile), aes.BlockSize))
+	return encryptAESECB(key, addPKCSPadding([]byte(userProfile), aesBlockSize))
 }
 func encryptUserProfileUnderRandomKey(userProfile string) []byte {
 	if len(randomKey13) == 0 {
@@ -240,7 +247,7 @@ func removePKCSPadding(in []byte) []byte {
 	for in[len(in)-1] == []byte("\x04")[0] {
 		in = in[:len(in)-1]
 		ctr++
-		if ctr == aes.BlockSize {
+		if ctr == aesBlockSize {
 			log.Fatal("Padding must not be longer than one block!")
 		}
 	}
@@ -259,11 +266,93 @@ func createAdminProfile() []byte {
 	dummyProfile = append(dummyProfile, bytes.Repeat([]byte("\x04"), 11)...)
 	dummyProfile = append(dummyProfile, []byte("123")...)
 	dummyCipher := encryptUserProfileUnderRandomKey(profileFor(string(dummyProfile)))
-	adminBlock := dummyCipher[16:32]
+	adminBlock := dummyCipher[aesBlockSize : 2*aesBlockSize]
 
 	// 19 is the length of the profile with an empty mail and without a user role ("email=&uid=10&role=")
-	email := bytes.Repeat([]byte("a"), 2*aes.BlockSize-19)
+	email := bytes.Repeat([]byte("a"), 2*aesBlockSize-19)
 	cipher := encryptUserProfileUnderRandomKey(profileFor(string(email)))
-	cipher = append(cipher[:len(cipher)-aes.BlockSize], adminBlock...)
+	cipher = append(cipher[:len(cipher)-aesBlockSize], adminBlock...)
 	return cipher
+}
+
+// challenge 14
+func encryptECBUnderRandomKeyWithPrefixAndSecret(buffer []byte) []byte {
+	if randLength == 0 {
+		rand.Seed(time.Now().UnixNano())
+		// define random length between 5 and 30
+		randLength = rand.Intn(25) + 5
+	}
+	randomPrefix := make([]byte, randLength)
+	rand.Read(randomPrefix)
+	input := append(randomPrefix, buffer...)
+	// input is (random prefix || given buffer || secret string)
+	return encryptECBUnderRandomKeyWithTailingSecret(input)
+}
+
+func hasDuplicateECBBlocks(cipher []byte) int {
+	for i := 0; i < len(cipher)-aesBlockSize; i++ {
+		block := cipher[i : i+aesBlockSize]
+		if bytes.Contains(cipher[i+aesBlockSize:], block) {
+			return i
+		}
+	}
+	return -1
+}
+
+func encOracle(buffer []byte, padding []byte, prefPadLength int) []byte {
+	buf := append(padding, buffer...)
+	res := encryptECBUnderRandomKeyWithPrefixAndSecret(buf)
+	return res[prefPadLength:]
+}
+
+func attackRandomKeyECBWithPrefixAndSecret() []byte {
+	// find length of prefix:
+	var prefixLength int
+	var foundLength bool
+	for i := 0; i < aesBlockSize; i++ {
+		buffer := bytes.Repeat([]byte("A"), i)
+		buffer = append(buffer, bytes.Repeat([]byte("B"), aesBlockSize*2)...)
+		cipher := encryptECBUnderRandomKeyWithPrefixAndSecret(buffer)
+		shift := hasDuplicateECBBlocks(cipher)
+		if shift != -1 {
+			// calculate the number of blocks to shift depending on the position of the found duplicate
+			blockShift := int(shift / aesBlockSize)
+			prefixLength = blockShift*aesBlockSize - i
+			foundLength = true
+			break
+		}
+	}
+	if !foundLength {
+		log.Fatal("Error: could not find length of random prefix.")
+	}
+	// padding is necessary to fill up the current block to ensure the buffer starts with a new block
+	paddingLength := aesBlockSize - (prefixLength % aesBlockSize)
+	padding := bytes.Repeat([]byte("A"), paddingLength)
+	prefPadLength := paddingLength + prefixLength
+
+	// rest of the attack like before:
+	deciphered := ""
+	for i := 0; i < len(encOracle([]byte{}, padding, prefPadLength)); i++ {
+		blockNumber := int(i / aesBlockSize)
+		blockOffset := blockNumber * aesBlockSize
+		// 3. crafting input block which is one byte short
+		dummy := bytes.Repeat([]byte("A"), aesBlockSize-(i%aesBlockSize)-1)
+		inBlock := append(dummy, []byte(deciphered)...)
+
+		// 4. create dictionary
+		dict := make(map[string]string)
+		for j := 0; j < 256; j++ {
+			cur := append(inBlock, []byte(string(j))...)
+			cur = encOracle(cur, padding, prefPadLength)[blockOffset : blockOffset+aesBlockSize]
+			dict[string(cur)] = string(j)
+		}
+		character, ok := dict[string(encOracle(dummy, padding, prefPadLength)[blockOffset:blockOffset+aesBlockSize])]
+		if ok {
+			deciphered += character
+		} else {
+			log.Fatal("Error: no entry found in dict!")
+		}
+	}
+	return []byte(deciphered)
+
 }
