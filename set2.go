@@ -49,8 +49,11 @@ func addPKCSPadding(in []byte, blockSize int) []byte {
 		return in
 	}
 	paddingLength := blockSize - (len(in) % blockSize)
-	padding := bytes.Repeat([]byte("\x04"), paddingLength)
-	return append(in, padding...)
+	for i := 0; i < paddingLength; i++ {
+		in = append(in, byte(paddingLength))
+	}
+
+	return in
 }
 
 func encryptAESECB(key []byte, plaintext []byte) []byte {
@@ -165,9 +168,11 @@ func attackRandomKeyECBWithTailingSecret() []byte {
 	}
 
 	deciphered := ""
-	for i := 0; i < len(encryptECBUnderRandomKeyWithTailingSecret([]byte{})); i++ {
+	length := len(encryptECBUnderRandomKeyWithTailingSecret([]byte{}))
+	var notInDictCtr int
+	for i := 0; i < length; i++ {
 		blockNumber := int(i / blockSize)
-		blockOffset := blockNumber * blockSize
+		offset := blockNumber * blockSize
 		// 3. crafting input block which is one byte short
 		dummy := bytes.Repeat([]byte("A"), blockSize-(i%blockSize)-1)
 		inBlock := append(dummy, []byte(deciphered)...)
@@ -176,15 +181,25 @@ func attackRandomKeyECBWithTailingSecret() []byte {
 		dict := make(map[string]string)
 		for j := 0; j < 256; j++ {
 			cur := append(inBlock, []byte(string(j))...)
-			cur = encryptECBUnderRandomKeyWithTailingSecret(cur)[blockOffset : blockOffset+blockSize]
+			cur = encryptECBUnderRandomKeyWithTailingSecret(cur)[offset : offset+blockSize]
 			dict[string(cur)] = string(j)
 		}
-		character, ok := dict[string(encryptECBUnderRandomKeyWithTailingSecret(dummy)[blockOffset:blockOffset+blockSize])]
+		character, ok := dict[string(encryptECBUnderRandomKeyWithTailingSecret(dummy)[offset:offset+blockSize])]
 		if ok {
 			deciphered += character
 		} else {
-			log.Fatal("Error: no entry found in dict!")
+			// not in dictionary might be because of the padding which is different depending on the length of the message, so it is not possible to decipher it here correctly
+			if len(deciphered) == 0 {
+				fmt.Println([]byte(deciphered)[len(deciphered)-1])
+				fmt.Println(deciphered)
+				log.Fatal("Error: no entry found in dict!")
+			}
+			notInDictCtr++
 		}
+	}
+	if (len(deciphered)+notInDictCtr)%blockSize != 0 {
+		fmt.Printf("len(deciphered)=%d, notInDictCtr=%d\n", len(deciphered), notInDictCtr)
+		log.Fatal("Error: result is not block-aligned")
 	}
 	return []byte(deciphered)
 }
@@ -243,27 +258,34 @@ func decryptUserProfileUnderRandomKey(cipher []byte) string {
 }
 
 func removePKCSPadding(in []byte) []byte {
-	ctr := 0
-	for in[len(in)-1] == []byte("\x04")[0] {
-		in = in[:len(in)-1]
-		ctr++
-		if ctr == aesBlockSize {
-			log.Fatal("Padding must not be longer than one block!")
+	if len(in) == 0 {
+		return in
+	}
+	last := in[len(in)-1]
+	if int(last) > len(in) {
+		return nil
+	}
+	// loop over the last bytes in reverse order and check whether the last n byte have the same value as the last byte
+	for i := 1; i < int(last); i++ {
+		if in[len(in)-1-i] != last {
+			return nil
 		}
 	}
-	return in
+	return in[:len(in)-int(last)]
 }
 
 func createAdminProfile() []byte {
 	// fixed layout since the content of the profile is fixed except for the mail which is attacker controlled
 	// idea:
-	// 1) create a block (somewhere within the encrypted profile) containing the word "admin" and the rest of the block is the padding element "\x04"
+	// 1) create a block (somewhere within the encrypted profile) containing the word "admin" and the rest of the block is padding
 	// 2) create a profile where the "user" part is in the beginning of the last block (so the second last block ends with "role="
 	// 3) add the block from 1 to the end to create a part "role=admin" for the user
 	// email=dummydummyadmin00000000000123&uid=10&role=user
 	// |-blocksize=16-||-blocksize=16-||-blocksize=16-|
 	dummyProfile := []byte("dummydummyadmin")
-	dummyProfile = append(dummyProfile, bytes.Repeat([]byte("\x04"), 11)...)
+	for i := 0; i < 11; i++ {
+		dummyProfile = append(dummyProfile, byte(11))
+	}
 	dummyProfile = append(dummyProfile, []byte("123")...)
 	dummyCipher := encryptUserProfileUnderRandomKey(profileFor(string(dummyProfile)))
 	adminBlock := dummyCipher[aesBlockSize : 2*aesBlockSize]
@@ -332,9 +354,11 @@ func attackRandomKeyECBWithPrefixAndSecret() []byte {
 
 	// rest of the attack like before:
 	deciphered := ""
-	for i := 0; i < len(encOracle([]byte{}, padding, prefPadLength)); i++ {
+	length := len(encOracle([]byte{}, padding, prefPadLength))
+	var notInDictCtr int
+	for i := 0; i < length; i++ {
 		blockNumber := int(i / aesBlockSize)
-		blockOffset := blockNumber * aesBlockSize
+		offset := blockNumber * aesBlockSize
 		// 3. crafting input block which is one byte short
 		dummy := bytes.Repeat([]byte("A"), aesBlockSize-(i%aesBlockSize)-1)
 		inBlock := append(dummy, []byte(deciphered)...)
@@ -343,15 +367,25 @@ func attackRandomKeyECBWithPrefixAndSecret() []byte {
 		dict := make(map[string]string)
 		for j := 0; j < 256; j++ {
 			cur := append(inBlock, []byte(string(j))...)
-			cur = encOracle(cur, padding, prefPadLength)[blockOffset : blockOffset+aesBlockSize]
+			cur = encOracle(cur, padding, prefPadLength)[offset : offset+aesBlockSize]
 			dict[string(cur)] = string(j)
 		}
-		character, ok := dict[string(encOracle(dummy, padding, prefPadLength)[blockOffset:blockOffset+aesBlockSize])]
+		character, ok := dict[string(encOracle(dummy, padding, prefPadLength)[offset:offset+aesBlockSize])]
 		if ok {
 			deciphered += character
 		} else {
-			log.Fatal("Error: no entry found in dict!")
+			// not in dictionary might be because of the padding which is different depending on the length of the message, so it is not possible to decipher it here correctly
+			if len(deciphered) == 0 {
+				fmt.Println([]byte(deciphered)[len(deciphered)-1])
+				fmt.Println(deciphered)
+				log.Fatal("Error: no entry found in dict!")
+			}
+			notInDictCtr++
 		}
+	}
+	if (len(deciphered)+notInDictCtr)%aesBlockSize != 0 {
+		fmt.Printf("len(deciphered)=%d, notInDictCtr=%d\n", len(deciphered), notInDictCtr)
+		log.Fatal("Error: result is not block-aligned")
 	}
 	return []byte(deciphered)
 
