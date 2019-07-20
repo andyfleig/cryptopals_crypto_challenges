@@ -127,3 +127,24 @@ func TestChallenge15(t *testing.T) {
 		t.Error("c15: wrong result")
 	}
 }
+
+func TestCreateBitFlipMask(t *testing.T) {
+	//"A" = 01000001
+	//";" = 00111011
+	//		01111010 = 122
+	preByte := []byte("A")
+	reqByte := []byte(";")
+	res := createBitFlipMask(preByte[0], reqByte[0])
+	if res != 122 {
+		t.Error("createBitFlipMask: wrong result: ", res)
+	}
+}
+
+func TestChallenge16(t *testing.T) {
+	iv := createRandomAESKey()
+	res := isCBCAdminCookie(attackCBCUnderRandomKeyAsCookie(iv), iv)
+	if !res {
+		t.Error("c16: wrong result: cookie is no valid admin cookie")
+	}
+}
+

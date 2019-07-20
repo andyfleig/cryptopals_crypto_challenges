@@ -56,6 +56,12 @@ func addPKCSPadding(in []byte, blockSize int) []byte {
 	return in
 }
 
+// challenge 16
+var (
+	randomKey16 []byte
+)
+
+
 func encryptAESECB(key []byte, plaintext []byte) []byte {
 	keySize := len(key)
 	block, err := aes.NewCipher(key)
@@ -389,4 +395,83 @@ func attackRandomKeyECBWithPrefixAndSecret() []byte {
 	}
 	return []byte(deciphered)
 
+}
+
+// challenge 16
+func encryptCBCUnderRandomKeyAsCookie(buffer []byte, iv []byte) []byte {
+	s1 := []byte("comment1=cooking%20MCs;userdata=")
+	s2 := []byte(";comment2=%20like%20a%20pound%20of%20bacon")
+	// layout: s1 || buffer || s2
+
+	// quote out special characters ("=" and ";")
+	buffer= bytes.Replace(buffer, []byte("="), []byte("'='"), -1)
+	buffer = bytes.Replace(buffer, []byte(";"), []byte("';'"), -1)
+
+	input := append(s1, buffer...)
+	input = append(input, s2...)
+
+	padded_input := addPKCSPadding(input, aesBlockSize)
+	if len(randomKey16) == 0 {
+		randomKey16 = createRandomAESKey()
+	}
+	return encryptAESCBC(randomKey16, padded_input, iv)
+}
+
+func isCBCAdminCookie(cipher []byte, iv []byte) bool {
+	if len(randomKey16) == 0 {
+		log.Fatal("Error: Key for decryption not set")
+	}
+	plaintext := decryptAESCBC(randomKey16, cipher, iv)
+	if strings.Contains(string(plaintext), string(";admin=true;")) {
+		return true
+	}
+	return false
+}
+
+func attackCBCUnderRandomKeyAsCookie(iv []byte) []byte {
+	input := bytes.Repeat([]byte("A"), 2*aesBlockSize)
+	// desired layout: comment1=cooking%20MCs;userdata=AAAAAAAAAAAAAAAA;admin=true;AAAA;comment2=%20like%20a%20pound%20of%20bacon"PPPPP
+	// blocks:		   |-blocksize=16-||-blocksize=16-||-blocksize=16-||-blocksize=16-||-blocksize=16-||-blocksize=16-||-blocksize=16-|
+	// since every bitflip completely scrambles the block itself and also flips the same bit in the next block
+	// therefore we need a full block before the one to change, which can be manipulated without destroying important parts of the cookie
+	cipher := encryptCBCUnderRandomKeyAsCookie(input, iv)
+	s1Length := 32
+	sec_token := []byte(";admin=true;")
+	for i, char := range sec_token {
+		// for each byte in the block before, flip the bits corresponding to its bitflip-mask
+		mask := createBitFlipMask([]byte("A")[0], char)
+		cipher[s1Length + i] = byte(int(cipher[s1Length + i]) ^ mask)
+	}
+	return cipher
+}
+
+// Creates a bitflip-mask which can be used by XORing it to the given preBlockByte to achieve the corresponding byte in the following block to become reqByte
+func createBitFlipMask(preBlockByte byte, reqByte byte) int {
+	mask := 0
+	for i := 8; i >= 0; i-- {
+		// loop over the 8 bits of the byte and find the correct bit for the bitflip-mask
+		var preBit, reqBit int
+		if int(preBlockByte) & (1 << uint(i)) == 0 {
+			// i-th bit of preBlockByte is 0
+			preBit = 0
+		} else {
+			preBit = 1
+		}
+		if int(reqByte) & (1 << uint(i)) == 0 {
+			// i-th bit of reqByte is 0
+			reqBit = 0
+		} else {
+			reqBit = 1
+		}
+		if preBit == reqBit {
+			// no bitflip necessary
+			mask = mask << 1
+		} else {
+			// bitflip necessary
+			mask = mask | 1
+			mask = mask << 1
+		}
+	}
+	mask = mask >> 1
+	return mask
 }
